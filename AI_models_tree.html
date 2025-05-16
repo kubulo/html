@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Models Radial Tree</title>
+    <!-- 引入 D3.js 库，使用 CDN，确保网络连接正常 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* 防止页面滚动 */
+            width: 100vw; /* 宽度占满视口 */
+            height: 100vh; /* 高度占满视口 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f8f9fa; /* 浅灰色背景 */
+        }
+        .container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .node circle {
+            fill: #fff; /* 节点填充色 */
+            stroke: #555; /* 节点边框色 */
+            stroke-width: 2px;
+            cursor: pointer; /* 鼠标悬停时显示手形光标 */
+            transition: all 0.3s ease; /* 平滑过渡效果 */
+        }
+        .node circle:hover {
+            fill: #f0f0f0;
+            stroke: #000;
+            stroke-width: 3px;
+        }
+        .node text {
+            font-size: 12px;
+            font-family: sans-serif;
+            pointer-events: none; /* 让鼠标事件穿透文本到下方的圆形 */
+            text-shadow: 0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff; /* 文本描边，提高可读性 */
+        }
+        .link {
+            fill: none;
+            stroke: #ccc; /* 连线颜色 */
+            stroke-width: 1.5px;
+        }
+        .tooltip {
+            position: absolute;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.95); /* 半透明白色背景 */
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            pointer-events: none; /* 确保鼠标可以点击下方的元素 */
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* 阴影效果 */
+            opacity: 0; /* 默认隐藏 */
+            transition: opacity 0.3s; /* 渐变显示/隐藏 */
+            z-index: 10; /* 层级靠上 */
+            max-width: 300px; /* 最大宽度，防止过长 */
+            word-wrap: break-word; /* 自动换行 */
+            line-height: 1.5;
+        }
+        .tooltip strong {
+            display: block; /* 名称加粗并独立一行 */
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            display: flex; /* 让按钮排成一行 */
+            gap: 5px; /* 按钮间距 */
+        }
+        .controls button {
+            padding: 5px 10px;
+            cursor: pointer;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        .controls button:hover {
+            background: #e0e0e0;
+        }
+         /* 如果需要添加logo图片，可以为这里的img标签添加样式 */
+        /* .logo {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+        } */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- SVG 元素将占据整个 container -->
+        <svg width="100%" height="100%"></svg>
+        <!-- 工具提示 div -->
+        <div class="tooltip"></div>
+        <!-- 控制按钮 div -->
+        <div class="controls">
+            <button id="zoom-in">放大 +</button>
+            <button id="zoom-out">缩小 -</button>
+            <button id="reset">重置视图</button>
+        </div>
+    </div>
+
+    <script>
+        // 数据结构，增加了 description 字段用于工具提示
+        const data = {
+            name: "人工智能 AI 模型",
+            description: "精选的AI模型和产品集",
+            children: [
+                {
+                    name: "LLM（全球）",
+                    description: "全球领先的大型语言模型，擅长自然语言处理和理解",
+                    children: [
+                        { name: "Claude", description: "Anthropic公司开发的对话式AI助手，注重安全性和有帮助的回答" },
+                        { name: "ChatGPT", description: "OpenAI开发的流行聊天机器人，擅长广泛的文本生成任务" },
+                        { name: "Gemini", description: "Google开发的多模态模型，整合了文本和图像理解能力" },
+                        { name: "Grok-XAI", description: "由xAI开发的模型，整合了实时搜索功能" },
+                        { name: "Llama (Hugging Face Space)", description: "Meta开发的开源大型语言模型，可在Hugging Face平台上使用" },
+                        { name: "Mistral", description: "法国Mistral AI开发的开源语言模型，在小尺寸下表现优异" }
+                    ]
+                },
+                {
+                    name: "LLM（中国）",
+                    description: "中国领先的大型语言模型，在中文处理上具有特殊优势",
+                    children: [
+                        { name: "文心一言", description: "百度开发的AI大模型，擅长中文创作和多模态理解" },
+                        { name: "讯飞星火", description: "科大讯飞开发的认知大模型，语言理解和专业知识见长" },
+                        { name: "智谱 AI", description: "清华大学背景的AI公司开发的模型，学术能力强" },
+                        { name: "通义千问", description: "阿里巴巴开发的大语言模型，擅长知识问答和商业应用" },
+                        { name: "腾讯混元", description: "腾讯开发的大语言模型，整合了腾讯生态资源" },
+                        { name: "月之暗面", description: "专注于自然语言处理的中国创业公司开发的模型" },
+                        { name: "抖音豆包", description: "字节跳动开发的大语言模型，整合了短视频生态" }
+                    ]
+                },
+                 {
+                    name: "图像",
+                    description: "专注于图像生成和编辑的AI模型",
+                    children: [
+                        { name: "Midjourney", description: "著名的文本到图像生成服务，艺术风格突出" },
+                        { name: "DALL-E", description: "OpenAI开发的文本到图像模型，擅长创意和精确描述" },
+                        { name: "Leonardo", description: "专业级AI艺术和图像生成平台" },
+                        { name: "DeepAI", description: "提供AI工具和API，包括图像生成" },
+                        { name: "Craiyon", description: "免费的AI图像生成工具" },
+                        { name: "NightCafe", description: "AI艺术生成平台，支持多种风格" },
+                        { name: "Stable Diffusion AI", description: "开源的图像生成模型，可本地部署或云端使用" },
+                        { name: "Bing AI Image Creator", description: "微软集成的基于DALL-E的图像生成工具" },
+                        { name: "ControlNet", description: "Stable Diffusion的扩展，用于精确控制图像生成" },
+                        { name: "DreamStudio", description: "Stability AI提供的图像生成平台" },
+                        { name: "腾讯混元 AI 图像", description: "腾讯开发的图像生成模型，适合中文场景" },
+                        { name: "文心一格", description: "百度开发的AI艺术创作平台" },
+                        { name: "百度绘画", description: "百度提供的AI绘画服务" },
+                        { name: "Adobe Firefly", description: "Adobe开发的创意图像生成工具，集成到Creative Cloud" },
+                        { name: "Leap AI", description: "提供API接口的图像生成服务" },
+                        { name: "意间 AI", description: "中国开发的AI绘画平台" },
+                        { name: "Blockadelabs", description: "专注于3D和VR内容创建的AI平台" },
+                        { name: "Civitai", description: "AI模型社区和市场，分享自定义模型和生成作品" },
+                        { name: "Clipdrop", description: "快速图像编辑和生成工具，由Stability AI开发" },
+                        { name: "Code Former", description: "用于图像修复和增强的AI工具" },
+                        { name: "DALL-E (Copilot Designer)", description: "微软Copilot中的设计助手，集成DALL-E功能" },
+                        { name: "Deep Dream Generator", description: "创造梦幻般视觉效果的图像处理工具" },
+                        { name: "Diffbot", description: "网页数据提取和结构化工具，可能与图像爬取有关" },
+                        { name: "Firefly", description: "Adobe Firefly的另一个提及，用于创意图像生成" },
+                        { name: "Freepic Pikaso", description: "Freepik的AI图像生成工具" },
+                        { name: "Gemini (图像)", description: "Google Gemini的多模态能力，可理解和生成图像" },
+                        { name: "ImgPilot", description: "AI图像处理和优化工具" },
+                        { name: "Krea AI", description: "创意内容生成平台，包括图像生成" },
+                        { name: "Latent Consistency", description: "一种图像生成技术（Latent Consistency Models）" },
+                        { name: "Lexica", description: "Stable Diffusion图像搜索和生成平台" },
+                        { name: "LibLibAI", description: "中文AI模型社区，类似Civitai" },
+                        { name: "Magnific", description: "图像放大和增强工具" },
+                        { name: "OpenArt", description: "AI艺术生成和探索平台" },
+                        { name: "Vega AI", description: "专注于艺术和创意图像生成的AI平台" },
+                        { name: "Wujie AI", description: "无界AI，中国AI绘画社区和工具" }
+
+                    ]
+                },
+                 {
+                    name: "视频",
+                    description: "专注于视频生成和编辑的AI模型",
+                    children: [
+                         { name: "Stable Video Diffusion (replicate)", description: "通过Replicate平台使用的Stable Video Diffusion模型" },
+                        { name: "Stable Video Diffusion (Fal.ai)", description: "通过Fal.ai平台使用的Stable Video Diffusion模型" },
+                        { name: "Sora", description: "OpenAI开发的文本到视频生成模型，能创建高质量逼真视频" },
+                        { name: "Runway", description: "提供视频编辑和生成功能的AI创意套件" },
+                        { name: "Pika", description: "专注于短视频创作的AI工具" },
+                        { name: "Pixverse", description: "用于视频和图像处理的AI平台" },
+                        { name: "Morph Studio", description: "专注于视频形态变换和特效的AI工具" },
+                        { name: "Kaiber", description: "AI驱动的视频创作平台" },
+                        { name: "Moonvalley", description: "提供风格化视频创作的AI工具" },
+                        { name: "Domo AI", description: "可能与视频或动画相关的AI工具" },
+                        { name: "AnimateDiff (replicate)", description: "通过Replicate平台使用的AnimateDiff模型，用于生成动态效果" }
+                    ]
+                },
+                 {
+                    name: "音频",
+                    description: "音频处理和生成相关的AI工具",
+                    children: [
+                        { name: "Stable Audio", description: "Stability AI开发的音乐和音效生成模型" },
+                        { name: "X Studio", description: "腾讯开发的AI音乐创作工具" },
+                        { name: "Udio", description: "AI音乐创作平台" },
+                        { name: "Suno", description: "AI音乐生成工具，擅长生成带人声的歌曲" },
+                        { name: "Mubert", description: "为各种场景生成免版税音乐的AI服务" },
+                        { name: "AIVA", description: "AI作曲助手，可创作各种风格的音乐" },
+                        { name: "OpenAI 语音引擎", description: "OpenAI开发的语音合成引擎，可模仿人声" },
+                        { name: "ElevenLabs", description: "高质量的AI语音生成平台，支持多种语言和情感" },
+                        { name: "讯飞智作", description: "科大讯飞的AI内容生成平台，包含语音合成" },
+                        { name: "微软听云", description: "微软的语音相关服务" },
+                        { name: "字节火山语音", description: "字节跳动火山引擎的语音技术" },
+                        { name: "大饼 AI 变声", description: "AI变声工具" },
+                        { name: "剪映 AI 克隆声音", description: "剪映的AI声音克隆功能" },
+                         { name: "Adobe Podcast AI", description: "Adobe开发的用于增强和编辑播客的AI工具" },
+                        { name: "Descript", description: "音频和视频编辑平台，提供转录和语音编辑" },
+                        { name: "Splice", description: "音乐制作平台，集成AI音频生成功能" },
+                        { name: "Sound.Studio", description: "AI驱动的音频制作工具" },
+                        { name: "Endel", description: "生成个性化功能性声音的AI平台" },
+                        { name: "Soundraw", description: "AI作曲和音乐生成平台" },
+                        { name: "Moises", description: "AI音频分离和处理工具" }
+                    ]
+                },
+                 {
+                    name: "设计",
+                    description: "用于视觉设计和创意内容生成的AI工具",
+                    children: [
+                        { name: "Canva", description: "集成AI功能的流行设计平台，用于创建各种视觉内容" },
+                        { name: "Beautiful.ai", description: "AI驱动的演示文稿创建工具，自动美化设计" },
+                        { name: "Tome", description: "AI驱动的叙事和演示工具，自动生成故事性内容" },
+                        { name: "Gamma", description: "AI辅助的演示和文档创建工具" },
+                        { name: "万知", description: "AI驱动的文档和内容生成工具" },
+                        { name: "创客贴", description: "中国流行的在线设计平台，集成了AI功能" },
+                        { name: "歌手PPT", description: "AI驱动的PPT生成工具" }
+                    ]
+                },
+                 {
+                    name: "编程",
+                    description: "辅助编程和代码生成的AI工具",
+                    children: [
+                        { name: "Github Copilot", description: "由OpenAI Codex驱动的代码补全和生成工具" },
+                        { name: "Cursor", description: "集成AI的编辑器，专注于代码生成和辅助" },
+                        { name: "1024 Code", description: "可能与编程或开发者工具相关的AI服务" },
+                        { name: "Coda", description: "融合文档和应用程序的协作平台，集成AI功能" },
+                        { name: "Wix", description: "网站建设平台，集成了AI设计和编程助手" },
+                        { name: "V2EX Copilot", description: "针对开发者社区的编程助手" }
+                    ]
+                },
+                 {
+                    name: "人声",
+                    description: "语音合成和处理相关的AI模型，可能包含数字人/虚拟人",
+                    children: [
+                        { name: "讯飞智作", description: "科大讯飞的AI内容生成平台，包含数字人" },
+                        { name: "商汤如影", description: "商汤科技的数字人生成平台" },
+                        { name: "Synthesia", description: "AI视频生成平台，使用数字人形象" },
+                        { name: "Rask AI", description: "AI视频本地化工具，包括语音克隆和翻译" },
+                        { name: "Kalidoface", description: "实时面部捕捉和虚拟形象工具" },
+                        { name: "HeyGen", description: "AI视频翻译和配音平台，支持数字人形象" },
+                        { name: "D-ID", description: "数字人视频生成平台，结合语音合成和动画" },
+                        { name: "OpenAI Voice Engine", description: "OpenAI开发的语音合成引擎，可模仿人声" },
+                        { name: "ElevenLabs", description: "高质量的AI语音生成平台，支持多种语言和情感" },
+                        { name: "文心一言语音", description: "百度开发的中文语音合成技术" },
+                        { name: "讯飞星火语音", description: "科大讯飞开发的语音合成技术，中文自然度高" },
+                        { name: "Kreadoer", description: "AI驱动的创意音频工具" },
+                        { name: "Runway (可能包含数字人功能)", description: "提供视频编辑和生成功能的AI创意套件，可能包含数字人相关功能" }
+                    ]
+                },
+                 {
+                    name: "搜索",
+                    description: "专注于搜索和信息提取的AI工具",
+                    children: [
+                        { name: "秘塔 AI 搜索", description: "中国开发的AI搜索引擎" },
+                        { name: "天工 AI 搜索", description: "中国开发的AI搜索引擎" },
+                        { name: "Perplexity", description: "使用AI回答问题的搜索引擎" },
+                        { name: "Globe Explorer", description: "可能与地理或数据探索相关的AI工具" },
+                        { name: "Dew AI", description: "可能与搜索或信息提取相关的AI工具" }
+                    ]
+                },
+                {
+                    name: "3D",
+                    description: "专注于3D模型生成和处理的AI工具",
+                    children: [
+                         { name: "3DFY AI", description: "从图片生成3D模型的AI工具" },
+                        { name: "Artefacts AI", description: "可能与艺术品或文物数字化/3D化相关的AI" },
+                        { name: "CSM AI", description: "可能与3D或计算机图形学相关的AI" },
+                        { name: "Luma AI", description: "通过手机生成3D场景和模型的AI应用" },
+                        { name: "Meshy AI", description: "从文本或图片生成3D模型和纹理的AI工具" },
+                        { name: "Spline AI", description: "在线3D设计工具，集成AI功能" },
+                        { name: "Tripo3D", description: "AI驱动的3D模型生成平台" }
+                    ]
+                }
+            ]
+        };
+
+        // 设置布局尺寸和边距
+        const container = document.querySelector('.container');
+        const tooltip = document.querySelector('.tooltip');
+        const margin = { top: 80, right: 80, bottom: 80, left: 80 }; // 增加边距，为文本留出更多空间
+        // 根据窗口大小动态计算图表区域尺寸
+        let width = window.innerWidth - margin.left - margin.right;
+        let height = window.innerHeight - margin.top - margin.bottom;
+        // 计算径向树的半径，取宽高较小值的一半再减去一些偏移量
+        let radius = Math.min(width, height) / 2.2; // 适当减小半径，给外围节点更多空间
+
+        // 创建 SVG 元素并添加到 container，设置其尺寸为 container 的100%
+        const svg = d3.select("svg")
+            .attr("width", "100%")
+            .attr("height", "100%");
+
+        // 创建一个分组元素 g，用于承载图表内容，并将其平移到中心位置
+        const g = svg.append("g")
+            .attr("transform", `translate(${width / 2 + margin.left}, ${height / 2 + margin.top})`);
+
+        // 创建径向树布局
+        const tree = d3.tree()
+            .size([2 * Math.PI, radius]) // 树的大小 [角度范围, 半径]
+            .separation((a, b) => (a.parent == b.parent ? 2 : 3) / a.depth); // 增加节点间隔，缓解重叠
+
+        // 将原始数据转换为 D3 的层次结构数据
+        const root = d3.hierarchy(data)
+            .sort((a, b) => d3.ascending(a.data.name, b.data.name)); // 按名称排序节点
+
+        // 计算并应用树形布局
+        tree(root);
+
+        // 添加连接线 (links)
+        const link = g.selectAll(".link")
+            .data(root.links()) // 获取连接线数据
+            .enter().append("path") // 为每条连接线数据创建一个 path 元素
+            .attr("class", "link")
+            .attr("d", d3.linkRadial() // 使用径向链接生成器
+                .angle(d => d.x) // 设置角度
+                .radius(d => d.y)); // 设置半径
+
+        // 添加节点 (nodes)
+        const node = g.selectAll(".node")
+            .data(root.descendants()) // 获取所有节点数据
+            .enter().append("g") // 为每个节点数据创建一个 g 元素
+            .attr("class", "node")
+            .attr("transform", d => `translate(${radialPoint(d.x, d.y)})`); // 将 g 元素平移到节点位置
+
+        // 定义不同深度的节点颜色
+        const depthColors = [
+            "#1f77b4", // 根节点 (深度 0)
+            "#ff7f0e", // 第一级子节点 (深度 1)
+            "#2ca02c", // 第二级及以下子节点 (深度 >= 2)
+            "#9467bd" // 可以根据需要添加更多颜色
+        ];
+
+        // 在每个节点 g 元素中添加圆形 (circle)
+        node.append("circle")
+            .attr("r", d => d.depth === 0 ? 9 : (d.children ? 7 : 5)) // 根据深度和是否有子节点调整半径
+            .style("fill", d => depthColors[Math.min(d.depth, depthColors.length -1 )]) // 根据深度着色
+            .style("stroke", d => d3.rgb(depthColors[Math.min(d.depth, depthColors.length -1 )]).darker()) // 设置边框颜色为填充色的深色
+            .on("mouseover", function(event, d) {
+                // 鼠标悬停时，稍微放大圆形
+                d3.select(this)
+                    .transition()
+                    .duration(200)
+                    .attr("r", d.depth === 0 ? 12 : (d.children ? 10 : 8));
+
+                // 显示工具提示
+                tooltip.style("opacity", 1)
+                    .html(`<strong>${d.data.name}</strong>${d.data.description ? `<br>${d.data.description}` : ""}`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+            })
+            .on("mouseout", function(event, d) {
+                // 鼠标离开时，恢复圆形大小
+                d3.select(this)
+                    .transition()
+                    .duration(200)
+                    .attr("r", d.depth === 0 ? 9 : (d.children ? 7 : 5));
+
+                // 隐藏工具提示
+                tooltip.style("opacity", 0);
+            })
+            .on("click", function(event, d) {
+                // 点击节点时，居中显示该节点
+                clickToCenter(d);
+            });
+
+        // 在每个节点 g 元素中添加文本标签 (text)
+        node.append("text")
+            .attr("dy", "0.31em") // 垂直居中
+            .attr("x", d => d.x < Math.PI === !d.children ? 10 : -10) // 根据节点在左侧还是右侧，调整文本水平位置
+            .attr("text-anchor", d => d.x < Math.PI === !d.children ? "start" : "end") // 根据位置设置文本对齐方式
+            .attr("transform", d => d.x >= Math.PI ? "rotate(180)" : null) // 将右侧节点的文本旋转180度
+            .text(d => d.data.name) // 设置文本内容
+            .style("font-weight", d => d.depth <= 1 ? "bold" : "normal") // 根节点和一级子节点加粗
+            .style("font-size", d => { // 根据深度调整字体大小
+                if (d.depth === 0) return "18px";
+                if (d.depth === 1) return "15px";
+                return "12px";
+            });
+
+        // 辅助函数：将极坐标 (角度 x, 半径 y) 转换为笛卡尔坐标 [x, y]
+        function radialPoint(x, y) {
+            return [(y = +y) * Math.cos(x -= Math.PI / 2), y * Math.sin(x)];
+        }
+
+        // 缩放和平移功能
+        const zoom = d3.zoom()
+            .scaleExtent([0.2, 5]) // 设置最小和最大缩放比例
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform); // 应用缩放和平移变换到 g 元素
+            });
+
+        svg.call(zoom); // 将缩放行为绑定到 SVG 元素
+
+        // 居中显示选定节点的函数
+        function clickToCenter(d) {
+            // 计算节点在当前 g 坐标系中的位置
+            const [x, y] = radialPoint(d.x, d.y);
+            const scale = 1.5; // 放大比例
+
+            // 过渡动画实现平移和缩放，使点击的节点位于中心
+            svg.transition()
+                .duration(750) // 动画时长
+                .call(
+                    zoom.transform,
+                    // 计算新的变换：先缩放到目标比例，再平移使目标点位于容器中心
+                    d3.zoomIdentity
+                        .translate(width / 2 + margin.left - x * scale, height / 2 + margin.top - y * scale)
+                        .scale(scale)
+                );
+        }
+
+        // 控制按钮功能绑定事件监听器
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            svg.transition().call(zoom.scaleBy, 1.2); // 放大1.2倍
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            svg.transition().call(zoom.scaleBy, 0.8); // 缩小0.8倍
+        });
+
+        document.getElementById('reset').addEventListener('click', () => {
+            // 重置视图到初始状态（缩放1倍，平移到中心）
+            svg.transition().call(
+                zoom.transform,
+                d3.zoomIdentity.translate(width / 2 + margin.left, height / 2 + margin.top).scale(1)
+            );
+        });
+
+        // 窗口大小调整处理 (响应式)
+        window.addEventListener('resize', () => {
+            // 重新计算尺寸
+            width = window.innerWidth - margin.left - margin.right;
+            height = window.innerHeight - margin.top - margin.bottom;
+            radius = Math.min(width, height) / 2.2;
+
+            // 更新 SVG 尺寸 (虽然 SVG 设为100%，但内部计算依赖这些变量)
+            // svg.attr("width", width + margin.left + margin.right)
+            //    .attr("height", height + margin.top + margin.bottom); // SVG尺寸设为100%时不需要手动更新
+
+            // 更新树布局参数
+            tree.size([2 * Math.PI, radius]);
+            // 重新计算布局
+            tree(root);
+
+            // 更新连接线路径
+            link.attr("d", d3.linkRadial()
+                .angle(d => d.x)
+                .radius(d => d.y));
+
+            // 更新节点位置
+            node.attr("transform", d => `translate(${radialPoint(d.x, d.y)})`);
+
+            // 重置视图以适应新的窗口中心
+            svg.call(
+                zoom.transform,
+                d3.zoomIdentity.translate(width / 2 + margin.left, height / 2 + margin.top).scale(1)
+            );
+        });
+
+        // 初始视图设置 (居中显示)
+         // 使用一个小的延迟，确保在所有元素和计算都完成后再设置初始视图
+        setTimeout(() => {
+             svg.call(
+                zoom.transform,
+                 // 将 g 元素平移到 container 的中心
+                d3.zoomIdentity.translate(width / 2 + margin.left, height / 2 + margin.top).scale(1)
+            );
+        }, 100);
+
+
+    </script>
+</body>
+</html>
